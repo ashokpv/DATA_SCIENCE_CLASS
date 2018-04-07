@@ -1,0 +1,105 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Loading required files
+```{r}
+library(caret); 
+library(randomForest); 
+library(rpart); 
+library(doParallel); 
+library(e1071); 
+library(rpart.plot)
+```
+
+Reading train and test files
+```{r}
+set.seed(12345);
+train.data <- read.table(file="/home/ash/pml-training.csv"
+                         ,na.strings=c("NA","#DIV/0!",""), header=TRUE, sep=",")
+test.data <- read.table(file="/home/ash/pml-testing.csv"
+                        ,na.strings=c("NA","#DIV/0!",""),header=TRUE, sep=",")
+
+dim(train.data)
+dim(test.data) 
+
+#summary(train.data)
+#summary(test.data)
+
+```
+
+Data cleaning : Remove the variables that countains most NAs. 
+Remove ‘X’, ‘Name’ and ‘timestamps’ variables as these variables are of no use in prediction
+```{r}
+train.data <- train.data[, colSums(is.na(train.data)) == 0] 
+test.data <- test.data[, colSums(is.na(test.data)) == 0] 
+
+train.data <- train.data[,-c(1,5)]
+test.data     <- test.data[,-c(1,5)]
+
+
+dim(train.data)
+dim(test.data) 
+```
+
+The train.data set is divided in two parts, one for training and the other for cross validation
+The data is split to 3/4 in trainData and testData
+```{r}
+inTrain <- createDataPartition(train.data$classe, p=3/4, list=FALSE)
+trainData <- train.data[inTrain, ]
+testData <- train.data[-inTrain, ]
+
+dim(trainData)
+dim(testData) 
+```
+
+Using Random forest algorithm for creating model
+trainControl is the function to for training model
+```{r}
+
+train_model <- trainControl(method="cv", 5)
+model_RF <- train(classe ~ ., data=trainData, method="rf", trControl=train_model, ntree=250)
+model_RF
+
+```
+
+Performance evaluation of the Random forest algorithm.
+Now we want to estimate the performance of the model on the validation data set.
+A confusionMatrix function and both the estimated accuracy and the the estimated
+out-of-sample error of the model are calculated.
+
+```{r}
+predictRf <- predict(model_RF, testData)
+confusionMatrix(testData$classe, predictRf)
+
+```
+
+```{r}
+accuracy <- postResample(predictRf, testData$classe)
+accuracy
+```
+RF Model accuracy is 0.9995922, almost 99.9%
+
+
+The out of sample error for RF model is shown below
+```{r}
+outsamerr <- (1 - as.numeric(confusionMatrix(testData$classe, predictRf)$overall[1]))
+outsamerr
+```
+
+Prediction for the Test Data Set (testRaw).
+Prediction using the model modelRF just built using the raw initial data testRaw
+
+```{r}
+final_result <- predict(model_RF, test.data)
+
+final_result
+
+```
+
+```{r}
+tree_tree <- rpart(classe ~ ., data=trainData, method="class")
+prp(tree_tree) 
+```
+
